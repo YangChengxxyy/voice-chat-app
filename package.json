@@ -1,0 +1,40 @@
+{
+  "name": "voice-chat-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "server": "node server.js",
+    "start:all": "./start.sh",
+    "test:connection": "./test-start.sh",
+    "kill:all": "pkill -f 'server.js' && pkill -f 'next dev'",
+    "build:server": "echo 'Server build complete'",
+    "start:server": "node server.js",
+    "deploy:prepare": "npm run build && npm run build:server",
+    "postinstall": "npm run build"
+  },
+  "dependencies": {
+    "ahooks": "^3.9.0",
+    "next": "^14.2.31",
+    "react": "^18",
+    "react-dom": "^18",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@types/uuid": "^9.0.7",
+    "autoprefixer": "^10.0.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.0.3",
+    "postcss": "^8",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5"
+  }
+}
