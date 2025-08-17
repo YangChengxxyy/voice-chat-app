@@ -3,7 +3,7 @@
 ## 📋 部署概述
 
 **部署时间**: 2025-08-17  
-**部署方式**: Docker Compose  
+**部署方式**: Docker Compose (使用 `docker compose` 命令)  
 **状态**: ✅ 部署成功  
 
 ## 🎯 解决的问题
@@ -72,6 +72,7 @@
 ```
 
 ## 🔧 配置修改
+- 🔧 配置修改
 
 ### package.json
 - 移除了 `postinstall` 脚本以避免 Docker 构建问题
@@ -83,6 +84,7 @@
 ### docker-compose.yml
 - 暂时注释了健康检查配置
 - 简化了服务依赖关系
+- 注意：使用 `docker compose` 命令（新版本 Docker）而非 `docker-compose`
 
 ### Dockerfile
 - 添加了 curl 工具以支持健康检查（虽然当前未使用）
@@ -147,7 +149,7 @@ $ ./health-check.sh --quick
 如遇到问题，请参考：
 1. **README.md** - 详细使用说明
 2. **health-check.sh** - 自动诊断工具
-3. **docker-compose logs** - 查看详细日志
+3. **docker compose logs** - 查看详细日志
 4. **故障排除指南** - 常见问题解决方案
 
 ---

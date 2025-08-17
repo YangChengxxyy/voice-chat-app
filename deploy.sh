@@ -7,6 +7,20 @@ set -e
 
 echo "🚀 开始部署 VoiceChat Mini..."
 
+# 自动检测 Docker Compose 命令
+echo "🔍 检测 Docker Compose 命令..."
+COMPOSE_CMD=""
+if docker compose version &> /dev/null; then
+    COMPOSE_CMD="docker compose"
+    echo "✅ 使用 'docker compose' (新版本)"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+    echo "✅ 使用 'docker-compose' (旧版本)"
+else
+    echo "❌ 未找到 Docker Compose，请安装后重试"
+    exit 1
+fi
+
 # 设置代理（如果需要）
 export https_proxy=http://127.0.0.1:7890
 export http_proxy=http://127.0.0.1:7890
@@ -24,22 +38,22 @@ echo "✅ Docker 检查通过"
 
 # 停止现有容器（如果存在）
 echo "🛑 停止现有容器..."
-docker-compose down 2>/dev/null || true
+$COMPOSE_CMD down 2>/dev/null || true
 
 # 清理旧镜像（可选）
 if [ "$1" = "--clean" ]; then
     echo "🧹 清理旧镜像..."
-    docker-compose down --rmi all --volumes --remove-orphans 2>/dev/null || true
+    $COMPOSE_CMD down --rmi all --volumes --remove-orphans 2>/dev/null || true
     docker system prune -f
 fi
 
 # 构建镜像
 echo "🔨 构建 Docker 镜像..."
-docker-compose build
+$COMPOSE_CMD build
 
 # 启动服务
 echo "🚀 启动服务..."
-docker-compose up -d
+$COMPOSE_CMD up -d
 
 # 等待服务启动
 echo "⏳ 等待服务启动..."
@@ -47,7 +61,7 @@ sleep 10
 
 # 检查服务状态
 echo "🔍 检查服务状态..."
-docker-compose ps
+$COMPOSE_CMD ps
 
 # 测试服务
 echo "🧪 测试服务..."
@@ -76,10 +90,10 @@ echo "   Web 应用: http://localhost:3000"
 echo "   Socket 服务: http://localhost:3001"
 echo ""
 echo "📋 常用命令："
-echo "   查看日志: docker-compose logs -f"
-echo "   停止服务: docker-compose down"
-echo "   重启服务: docker-compose restart"
-echo "   查看状态: docker-compose ps"
+echo "   查看日志: $COMPOSE_CMD logs -f"
+echo "   停止服务: $COMPOSE_CMD down"
+echo "   重启服务: $COMPOSE_CMD restart"
+echo "   查看状态: $COMPOSE_CMD ps"
 echo ""
 echo "🔧 故障排除："
 echo "   如果遇到问题，请检查："

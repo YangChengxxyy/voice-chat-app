@@ -28,12 +28,17 @@
 
 ### 方法1: Docker 部署（推荐）
 
-**确保设置代理（如果需要）:**
+**检查 Docker Compose 版本兼容性:**
 ```bash
-export https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 all_proxy=socks5://127.0.0.1:7890
+./check-docker.sh
 ```
 
-**一键部署:**
+**通用部署脚本（自动适配 docker compose 版本）:**
+```bash
+./universal-deploy.sh
+```
+
+**传统部署脚本:**
 ```bash
 ./deploy.sh
 ```
@@ -45,10 +50,12 @@ export https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 all_pr
 
 **清理重新部署:**
 ```bash
-./deploy.sh --clean
+./universal-deploy.sh --clean
 ```
 
 访问应用：http://localhost:3000
+
+**注意**: 新版本 Docker 使用 `docker compose`，旧版本使用 `docker-compose`。脚本会自动检测并适配。
 
 ### 方法2: 一键启动
 
@@ -90,55 +97,81 @@ http://localhost:3000/test
 
 ### 系统要求
 
-- Docker 和 Docker Compose
+- Docker Desktop 或 Docker Engine
+- Docker Compose (新版本使用 `docker compose`，旧版本使用 `docker-compose`)
 - 代理配置（如果在国内网络环境）
 
-### 部署步骤
+### Docker Compose 版本兼容性
 
-1. **设置代理（可选）:**
+本项目支持两种 Docker Compose 命令：
+
+| 版本类型 | 命令 | 说明 |
+|---------|------|------|
+| **新版本** | `docker compose` | Docker Desktop 内置，推荐使用 |
+| **旧版本** | `docker-compose` | 独立安装的工具 |
+
+**自动检测命令:**
 ```bash
-export https_proxy=http://127.0.0.1:7890
-export http_proxy=http://127.0.0.1:7890  
-export all_proxy=socks5://127.0.0.1:7890
+./check-docker.sh
 ```
 
-2. **构建并启动服务:**
+### 部署方式
+
+#### 方式1: 通用部署（推荐）
+自动检测 Docker Compose 版本并部署：
+```bash
+# 标准部署
+./universal-deploy.sh
+
+# 清理后部署
+./universal-deploy.sh --clean
+
+# 不使用代理部署
+./universal-deploy.sh --no-proxy
+```
+
+#### 方式2: 传统部署
+使用预配置的部署脚本：
 ```bash
 ./deploy.sh
 ```
 
-3. **检查服务状态:**
+#### 方式3: 手动部署
+根据您的 Docker Compose 版本选择命令：
+
+**新版本 Docker (docker compose):**
 ```bash
-docker-compose ps
+docker compose build
+docker compose up -d
 ```
 
-4. **查看日志:**
+**旧版本 Docker (docker-compose):**
 ```bash
-docker-compose logs -f
+docker-compose build
+docker-compose up -d
 ```
 
-5. **停止服务:**
+### 管理命令
+
+**停止服务:**
 ```bash
 ./stop.sh
 ```
 
-### Docker 命令
-
+**查看状态:**
 ```bash
-# 构建镜像
-docker-compose build
+# 自动适配版本
+./universal-deploy.sh --help
 
-# 启动服务
-docker-compose up -d
+# 或手动使用对应命令
+docker compose ps    # 新版本
+docker-compose ps    # 旧版本
+```
 
-# 停止服务
-docker-compose down
-
-# 查看日志
-docker-compose logs
-
-# 重启服务
-docker-compose restart
+**查看日志:**
+```bash
+docker compose logs -f    # 新版本
+docker-compose logs -f    # 旧版本
 ```
 
 ### 服务信息
@@ -147,11 +180,19 @@ docker-compose restart
 - **Socket.io 服务端口**: 3001
 - **健康检查**: http://localhost:3001/health
 
+### 故障排除
+
+**如果遇到 "docker-compose: command not found" 错误:**
+1. 检查您使用的是新版本 Docker，应该使用 `docker compose`
+2. 或安装独立的 `docker-compose` 工具
+3. 使用 `./check-docker.sh` 检测当前环境
+4. 使用 `./universal-deploy.sh` 自动适配版本
+
 ## 🎮 使用说明
 
 1. **创建房间**: 点击"创建房间"，系统生成房间ID
 2. **加入房间**: 输入房间ID，输入姓名，允许麦克风权限
-3. **音频控制**: 
+3. **音频控制**:
    - 静音/取消静音: 点击麦克风按钮或按空格键
    - 调节音量: 使用音量滑块
    - 离开房间: Ctrl + L
