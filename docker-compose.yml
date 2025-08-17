@@ -14,7 +14,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - CORS_ORIGIN=http://localhost:3000,https://your-domain.com
+      - CORS_ORIGIN=http://localhost:3000,http://127.0.0.1:3000,http://host.docker.internal:3000,http://0.0.0.0:3000
       - ROOM_CLEANUP_INTERVAL=1800000
     volumes:
       - ./logs:/app/logs

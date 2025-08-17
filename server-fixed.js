@@ -14,6 +14,7 @@ const httpServer = createServer((req, res) => {
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not Found');
 });
+
 const io = new Server(httpServer, {
   cors: {
     origin: function (origin, callback) {
@@ -104,15 +105,17 @@ function addUserToRoom(roomId, user) {
   }
 
   // 检查用户是否已在房间中
-  const existingUserIndex = room.users.findIndex(u => u.id === user.id);
-  if (existingUserIndex !== -1) {
-    // 更新现有用户信息
-    room.users[existingUserIndex] = { ...room.users[existingUserIndex], ...user };
-  } else {
-    room.users.push(user);
+  const existingUser = room.users.find(u => u.id === user.id);
+  if (existingUser) {
+    existingUser.socketId = user.socketId;
+    existingUser.isConnected = true;
+    users.set(user.id, existingUser);
+    return { success: true, room, user: existingUser };
   }
 
-  users.set(user.id, { ...user, roomId });
+  room.users.push(user);
+  users.set(user.id, user);
+
   return { success: true, room, user };
 }
 
@@ -153,19 +156,9 @@ function updateUserInRoom(roomId, userId, updates) {
   return room.users[userIndex];
 }
 
+// Socket.io 连接处理
 io.on('connection', (socket) => {
-  console.log(`Client connected: ${socket.id} at ${new Date().toISOString()}`);
-
-  // 发送连接确认
-  socket.emit('connection-confirmed', {
-    socketId: socket.id,
-    timestamp: new Date().toISOString()
-  });
-
-  // 处理连接错误
-  socket.on('error', (error) => {
-    console.error(`Socket ${socket.id} error:`, error);
-  });
+  console.log(`User connected: ${socket.id}`);
 
   // 加入房间
   socket.on('join-room', ({ roomId, userName }) => {
@@ -176,56 +169,48 @@ io.on('connection', (socket) => {
       const result = addUserToRoom(roomId, user);
 
       if (!result.success) {
-        socket.emit('error', { message: result.error });
+        socket.emit('join-error', { error: result.error });
         return;
       }
 
-      // 加入Socket.io房间
       socket.join(roomId);
 
-      // 发送房间信息给新用户
-      socket.emit('room-joined', {
+      // 发送用户自己的信息
+      socket.emit('user-joined', {
+        user: result.user,
         room: result.room,
-        user: result.user
+        users: result.room.users
       });
 
       // 通知房间内其他用户
-      socket.to(roomId).emit('user-joined', result.user);
+      socket.to(roomId).emit('user-connected', {
+        user: result.user,
+        users: result.room.users
+      });
 
       console.log(`User ${userName} (${userId}) joined room ${roomId}`);
     } catch (error) {
       console.error('Error joining room:', error);
-      socket.emit('error', { message: 'Failed to join room' });
+      socket.emit('join-error', { error: 'Failed to join room' });
     }
   });
 
-  // 离开房间
-  socket.on('leave-room', ({ roomId, userId }) => {
+  // 用户状态更新
+  socket.on('user-state-change', ({ roomId, updates }) => {
     try {
-      const user = removeUserFromRoom(roomId, userId);
+      const user = Array.from(users.values()).find(u => u.socketId === socket.id);
+      if (!user) return;
 
-      if (user) {
-        socket.leave(roomId);
-        socket.to(roomId).emit('user-left', userId);
-        console.log(`User ${user.name} (${userId}) left room ${roomId}`);
-      }
-    } catch (error) {
-      console.error('Error leaving room:', error);
-    }
-  });
-
-  // 切换静音状态
-  socket.on('toggle-mute', ({ roomId, userId, isMuted }) => {
-    try {
-      const updatedUser = updateUserInRoom(roomId, userId, { isMuted });
-
+      const updatedUser = updateUserInRoom(roomId, user.id, updates);
       if (updatedUser) {
-        // 通知房间内所有用户
-        io.to(roomId).emit('user-updated', updatedUser);
-        console.log(`User ${updatedUser.name} ${isMuted ? 'muted' : 'unmuted'}`);
+        // 广播给房间内所有用户（包括自己）
+        io.to(roomId).emit('user-state-updated', {
+          userId: user.id,
+          updates: updates
+        });
       }
     } catch (error) {
-      console.error('Error toggling mute:', error);
+      console.error('Error updating user state:', error);
     }
   });
 
@@ -277,84 +262,81 @@ io.on('connection', (socket) => {
         }
       }
     } catch (error) {
-      console.error('Error handling WebRTC ICE candidate:', error);
+      console.error('Error handling ICE candidate:', error);
     }
   });
 
-  // 处理断开连接
-  socket.on('disconnect', (reason) => {
-    console.log(`Client ${socket.id} disconnected: ${reason} at ${new Date().toISOString()}`);
-
+  // 离开房间
+  socket.on('leave-room', ({ roomId }) => {
     try {
-      // 查找并移除断开连接的用户
       const user = Array.from(users.values()).find(u => u.socketId === socket.id);
-
       if (user) {
-        const roomId = user.roomId;
-        removeUserFromRoom(roomId, user.id);
-        socket.to(roomId).emit('user-left', user.id);
-        console.log(`User ${user.name} (${user.id}) disconnected from room ${roomId} at ${new Date().toISOString()}`);
+        const removedUser = removeUserFromRoom(roomId, user.id);
+        if (removedUser) {
+          socket.leave(roomId);
+          socket.to(roomId).emit('user-disconnected', {
+            user: removedUser,
+            users: getUsersInRoom(roomId)
+          });
+          console.log(`User ${removedUser.name} left room ${roomId}`);
+        }
       }
+    } catch (error) {
+      console.error('Error leaving room:', error);
+    }
+  });
+
+  // 断开连接处理
+  socket.on('disconnect', () => {
+    try {
+      const user = Array.from(users.values()).find(u => u.socketId === socket.id);
+      if (user) {
+        // 找到用户所在的房间
+        for (const [roomId, room] of rooms.entries()) {
+          const userInRoom = room.users.find(u => u.id === user.id);
+          if (userInRoom) {
+            const removedUser = removeUserFromRoom(roomId, user.id);
+            if (removedUser) {
+              socket.to(roomId).emit('user-disconnected', {
+                user: removedUser,
+                users: getUsersInRoom(roomId)
+              });
+              console.log(`User ${removedUser.name} disconnected from room ${roomId}`);
+            }
+            break;
+          }
+        }
+      }
+      console.log(`User disconnected: ${socket.id}`);
     } catch (error) {
       console.error('Error handling disconnect:', error);
     }
   });
-
-  // 处理重连
-  socket.on('reconnect', () => {
-    console.log(`Client ${socket.id} reconnected at ${new Date().toISOString()}`);
-    socket.emit('connection-confirmed', {
-      socketId: socket.id,
-      timestamp: new Date().toISOString(),
-      reconnected: true
-    });
-  });
 });
 
-// 定期清理空房间和离线用户
+// 定期清理空房间
 setInterval(() => {
-  const now = new Date();
-  const CLEANUP_INTERVAL = 30 * 60 * 1000; // 30分钟
-
-  // 清理长时间未活动的房间
-  for (const [roomId, room] of rooms.entries()) {
-    if (room.users.length === 0 && (now - room.createdAt) > CLEANUP_INTERVAL) {
-      rooms.delete(roomId);
-      console.log(`Cleaned up empty room: ${roomId}`);
+  try {
+    for (const [roomId, room] of rooms.entries()) {
+      if (room.users.length === 0) {
+        const roomAge = Date.now() - room.createdAt.getTime();
+        // 删除创建超过30分钟的空房间
+        if (roomAge > (process.env.ROOM_CLEANUP_INTERVAL || 1800000)) {
+          rooms.delete(roomId);
+          console.log(`Cleaned up empty room: ${roomId}`);
+        }
+      }
     }
+  } catch (error) {
+    console.error('Error during room cleanup:', error);
   }
-}, 10 * 60 * 1000); // 每10分钟运行一次清理
+}, 300000); // 每5分钟检查一次
 
+// 启动服务器
 const PORT = process.env.PORT || 3001;
-
-// 错误处理
-httpServer.on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use. Please try a different port.`);
-    process.exit(1);
-  } else {
-    console.error('Server error:', error);
-  }
-});
-
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Voice chat server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Server started at: ${new Date().toISOString()}`);
-  console.log(`CORS origins: ${process.env.NODE_ENV === 'production' ? 'production origins' : 'http://localhost:3000'}`);
-});
-
-// 优雅关闭
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  httpServer.close(() => {
-    console.log('Process terminated');
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  httpServer.close(() => {
-    console.log('Process terminated');
-  });
+  console.log(`CORS origins: ${process.env.CORS_ORIGIN || 'localhost development origins'}`);
 });
