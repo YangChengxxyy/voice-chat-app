@@ -13,8 +13,7 @@
     "kill:all": "pkill -f 'server.js' && pkill -f 'next dev'",
     "build:server": "echo 'Server build complete'",
     "start:server": "node server.js",
-    "deploy:prepare": "npm run build && npm run build:server",
-    "postinstall": "npm run build"
+    "deploy:prepare": "npm run build && npm run build:server"
   },
   "dependencies": {
     "ahooks": "^3.9.0",
