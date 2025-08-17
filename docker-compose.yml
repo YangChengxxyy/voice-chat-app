@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # Socket.io 服务器
@@ -14,7 +14,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - CORS_ORIGIN=http://localhost:3000,http://127.0.0.1:3000,http://host.docker.internal:3000,http://0.0.0.0:3000
+      - CORS_ORIGIN=http://localhost:3000,http://127.0.0.1:3000,http://host.docker.internal:3000,http://0.0.0.0:3000,http://47.96.113.32:3000
       - ROOM_CLEANUP_INTERVAL=1800000
     volumes:
       - ./logs:/app/logs
@@ -107,12 +107,12 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--storage.tsdb.retention.time=200h"
+      - "--web.enable-lifecycle"
     networks:
       - voicechat-network
     profiles:
